@@ -641,6 +641,72 @@ PE(TTM) = 股价 / TTM EPS
 
 ---
 
+## 📋 Git 版本控制管理方案
+
+### 基本信息
+| 项目 | 内容 |
+|------|------|
+| **仓库** | jerrywu200/openclaw-app-management |
+| **远程地址** | git@github.com:jerrywu200/openclaw-app-management.git |
+| **分支** | main (稳定版), dev (开发版) |
+| **当前分支** | dev |
+| **初始化日期** | 2026-03-31 |
+
+### 管理范围
+| 类别 | 说明 |
+|------|------|
+| ✅ 核心配置 | AGENTS.md, SOUL.md, USER.md, IDENTITY.md, MEMORY.md, HEARTBEAT.md, TOOLS.md, CAPABILITIES.md |
+| ✅ 分析框架 | stock_analysis_*.md, *.py (分析模块) |
+| ✅ 工具脚本 | stock_db_tool.py, daily_review_tool.py, weekly_review.py 等 |
+| ✅ 学习笔记 | learning/ 目录 |
+| ✅ 记忆文件 | memory/ 目录 |
+| ❌ 排除 | portfolio/, reports/, research/, analysis_cache/, tracking/, 归档文件/ |
+
+### .gitignore 关键规则
+```
+# 不版本控制的目录
+portfolio/
+reports/
+research/
+analysis_cache/
+tracking/
+归档文件/
+
+# 临时文件
+*.csv
+backup.sh
+daily_review.md
+002837_daily.csv
+300750_daily_tx.csv
+short_term_monitor.py
+trade_log_template.md
+```
+
+### Git 工作流
+```bash
+# 日常开发（当前分支）
+git checkout dev
+git add <文件>
+git commit -m "feat: 描述"
+git push origin dev
+
+# 稳定后合并到 main
+git checkout main
+git merge dev
+git push origin main
+```
+
+### 提交规范
+```
+feat: 新功能
+fix: Bug 修复
+docs: 文档更新
+refactor: 重构
+chore: 工具/配置更新
+```
+
+---
+
 ## 分析流程速查
 
 ### 个股分析流程（V3.5 十步法）
