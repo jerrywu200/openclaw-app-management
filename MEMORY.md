@@ -404,13 +404,174 @@ python3 analysis_sync.py --code {代码} --sync-target --target-low {下限} --t
 
 ---
 
-## 数据源使用规范
+## 数据源使用规范（2026-03-31 修订）
 
 ### 数据获取优先级
 
-**stock_db_tool > akshare > web_search（仅补充）**
+```
+🥇 stock_db（本地数据库，极高可靠性）
+    ↓
+🥈 Tavily（网络搜索，权威来源，AI优化）
+    ↓
+🥉 akshare 同花顺行业分类（唯一稳定接口）
+    ↓
+source: DuckDuckGo（备用网络搜索）
+```
 
-### ⚠️ stock_db正确使用方式
+### 一、各数据类型获取策略
+
+| 分析维度 | 数据类型 | 首选 | 备选 | 注意事项 |
+|---------|---------|------|------|----------|
+| **K线/价格** | 实时、历史 | stock_db | - | stock_db为盘后数据 |
+| **财务数据** | 报表、指标 | stock_db | Tavily | 不用akshare |
+| **行业分类** | 行业、概念 | akshare ths | Tavily | 同花顺最准确 |
+| **资金流向** | 主力/散户 | stock_db | - | - |
+| **新闻事件** | 公告、事件 | stock_db | Tavily | 关键词分析 |
+| **行业深度** | 竞争、趋势 | **Tavily** | web_search | **首选Tavily** |
+| **估值对比** | PE/PB/同行 | stock_db | Tavily | 同行数据用Tavily |
+| **股本验证** | 总股本、流通 | akshare | stock_db | 交叉验证 |
+
+### 二、Tavily 使用规范（⭐ 2026-03-31 新增）
+
+#### 适用场景
+| 场景 | 推荐度 | 说明 |
+|------|--------|------|
+| 行业深度研究 | ✅✅✅ | 研报摘要质量高 |
+| 公司竞争力分析 | ✅✅✅ | 权威来源多 |
+| 产业链研究 | ✅✅ | 信息全面 |
+| 宏观政策解读 | ✅✅ | 财经媒体覆盖广 |
+| 研报摘要 | ✅✅✅ | 有AI摘要功能 |
+
+#### 使用方式
+
+```bash
+# 基础搜索（5条结果）
+python ~/.openclaw/skills/tavily-search/scripts/search.py "查询内容"
+
+# 更多结果
+python ~/.openclaw/skills/tavily-search/scripts/search.py "查询内容" --max-results 10
+
+# 深度搜索（更准确）
+python ~/.openclaw/skills/tavily-search/scripts/search.py "查询内容" --search-depth advanced"
+```
+
+#### Python 调用
+
+```python
+import requests
+import os
+
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
+TAVILY_API_URL = "https://api.tavily.com/search"
+
+payload = {
+    "api_key": TAVILY_API_KEY,
+    "query": "你的查询",
+    "max_results": 5,
+    "search_depth": "basic"  # 或 "advanced"
+}
+
+response = requests.post(TAVILY_API_URL, json=payload, timeout=30)
+result = response.json()
+
+# 获取 AI 摘要
+if result.get('answer'):
+    print(result['answer'])
+
+# 获取搜索结果
+for r in result.get('results', []):
+    print(f"标题: {r['title']}")
+    print(f"内容: {r['content']}")
+```
+
+### 三、DuckDuckGo (web_search) 使用规范
+
+#### 适用场景
+| 场景 | 推荐度 | 说明 |
+|------|--------|------|
+| 快速信息检索 | ✅✅✅ | 速度快 |
+| 社交媒体热点 | ✅✅ | 覆盖知乎/微博 |
+| 突发事件 | ✅✅ | 实时性好 |
+| 代码/技术问题 | ✅✅ | StackOverflow丰富 |
+
+### 四、akshare 使用规范（修订）
+
+#### ⚠️ 当前状态（2026-03-31）
+akshare 大部分接口不稳定（Connection aborted），**仅同花顺行业分类可靠**。
+
+#### 仅存可靠的接口
+
+| 接口 | 用途 | 可靠性 |
+|------|------|--------|
+| `stock_board_industry_name_ths()` | **行业分类** | ✅✅✅ 稳定 |
+| `stock_financial_report_sina()` | 财务数据 | ⚠️ 偶有失败 |
+
+#### 已知不稳定接口
+| 接口 | 状态 | 原因 |
+|------|------|------|
+| `stock_zh_a_spot_em()` | ❌ 不可用 | Connection aborted |
+| `stock_zh_a_hist()` | ❌ 不可用 | Connection aborted |
+| `stock_individual_info_em()` | ❌ 不可用 | Connection aborted |
+| `stock_board_concept_name_em()` | ❌ 不可用 | Connection aborted |
+| `stock_money_flow_em()` | ❌ 不可用 | 接口不存在 |
+
+### 五、行业深度研究流程
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│               行业深度研究数据获取流程                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Step 1: 基础数据（stock_db）                              │
+│    └─ 获取行业分类、成分股、龙头公司                         │
+│                                                             │
+│  Step 2: 行业搜索（Tavily）⭐                               │
+│    ├─ 搜索1: "[行业] 2026年发展趋势"                      │
+│    ├─ 搜索2: "[行业] 竞争格局 龙头公司"                   │
+│    └─ 搜索3: "[行业] AI/新能源 等关键词影响"               │
+│                                                             │
+│  Step 3: 研报搜索（Tavily）                                │
+│    ├─ 搜索1: "[公司] 证券研报 目标价"                       │
+│    └─ 搜索2: "[行业] 券商评级 投资建议"                     │
+│                                                             │
+│  Step 4: 补充搜索（DuckDuckGo）                            │
+│    └─ 突发新闻、社交媒体热点                                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 六、数据源速查表
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    数据源速查表                                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📊 基本面数据                                              │
+│     → stock_db（主力）                                     │
+│                                                             │
+│  📈 技术数据                                               │
+│     → stock_db（主力）                                     │
+│                                                             │
+│  🏭 行业分类                                               │
+│     → akshare ths（主力）                                 │
+│     → Tavily（备选）                                       │
+│                                                             │
+│  📰 行业深度研究                                           │
+│     → Tavily（主力）⭐                                     │
+│     → web_search（补充）                                   │
+│                                                             │
+│  📑 研报摘要                                               │
+│     → Tavily（主力）⭐                                     │
+│                                                             │
+│  ⚡ 实时新闻                                               │
+│     → web_search（主力）                                   │
+│     → stock_db news（备选）                                 │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 七、⚠️ stock_db正确使用方式
 
 **stock_db是MySQL数据库，不是Python模块！**
 
@@ -426,15 +587,16 @@ from stock_db_tool import get_stock_kline, get_stock_finance, get_stock_fund_flo
 - 数据库名：stock_db
 - 工具文件：`/Users/jw/.openclaw/workspace/stock_db_tool.py`
 
-### 核心数据来源
+### 八、核心数据来源
 
 | 数据类型 | 来源 | 导入方式 |
 |----------|------|----------|
 | K线/财务/资金流向 | stock_db_tool | `sys.path.insert(0, workspace); from stock_db_tool import ...` |
-| 股本验证/研报预测 | akshare | `import akshare as ak` |
-| 新闻/行业数据 | web_search | `web_search tool` |
+| 行业分类 | akshare ths | `ak.stock_board_industry_name_ths()` |
+| 行业深度研究 | **Tavily** | `~/.openclaw/skills/tavily-search/scripts/search.py` |
+| 实时新闻 | web_search | `web_search tool` |
 
-### 📋 stock_db_tool 新增函数（2026-03-29）
+### 九、📋 stock_db_tool 新增函数（2026-03-29）
 
 #### 新闻资讯数据
 - `get_stock_news(stock_code, news_type, limit, days)` - 获取股票新闻（默认最近1年，自动过滤未来日期）
